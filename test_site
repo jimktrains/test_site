@@ -1,0 +1,80 @@
+#!/bin/bash
+
+max_timeout=15
+ttw=600
+source $1
+
+site=$(echo $url | cut -d / -f 3)
+# want dig ret to be 0, otherwise indicative of network issues
+dig_req=$(dig $site)
+dig_ret=$?
+if [[ $dig_ret != 0 ]]; then
+    echo "Network may be down"
+fi
+
+http_req=$(curl --max-time $max_timeout -v $url 2>&1 )
+http_ret=$?
+scwd=`dirname $0`
+time_file=$scwd/test_$site.dat
+[[ ! -e $time_file ]] && touch $time_file
+
+host=$(echo $(hostname) | perl -wp -e '$_ = ucfirst' -)
+if [[ $http_req != *HTTP/1.1*200* ]]; then
+    last_time=$(cat $time_file)
+    [[ -z $last_time ]] && last_time=0
+    now=$(date +%s)
+    diff=$(($now - $last_time))
+    #Don't send email if it was less than 10 min ago
+    if [[ $diff -gt $ttw ]]; then
+        mailx \
+            -S smtp-auth-user=$smtp_user \
+            -S smtp-auth-password=$smtp_passwd \
+            -S smtp-auth=login \
+            -S smtp=$smtp_server \
+            -S from=$smtp_from \
+            -s "$site May be Down" \
+            $to \
+<<EOM
+To whom it may concern,
+
+I'm sure you already know this, but at $(date), I couldn't
+get $url to give me an HTTP 200 status in $max_timeout seconds.
+
+:[
+
+XOXOXO,
+$host
+EOM
+        date +%s > $time_file
+        echo "Email Sent"
+    else
+        echo "Only been $diff sec"
+    fi
+else
+    last_time=$(cat $time_file)
+    [[ -z $last_time ]] && last_time=0
+    if [[ $last_time -gt 0 ]]; then
+        echo ''>  $time_file
+        mailx \
+            -S smtp-auth-user=$smtp_user \
+            -S smtp-auth-password=$smtp_passwd \
+            -S smtp-auth=login \
+            -S smtp=$smtp_server \
+            -S from=$smtp_from \
+            -s "$site is up" \
+            $to \
+<<EOM
+To whom it may concern,
+
+Something must have changed since I sent my last email, 
+because as of $(date) I can get $url to give me an 
+HTTP 200 status in $max_timeout seconds.
+
+\o/
+
+XOXOXO,
+$host
+EOM
+    fi
+    echo "All Clear"
+fi
