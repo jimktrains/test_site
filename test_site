@@ -10,6 +10,7 @@ dig_req=$(dig $site)
 dig_ret=$?
 if [[ $dig_ret != 0 ]]; then
     echo "Network may be down"
+    exit
 fi
 
 http_req=$(curl --max-time $max_timeout -v $url 2>&1 )
