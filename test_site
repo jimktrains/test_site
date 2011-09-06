@@ -13,6 +13,15 @@ if [[ $dig_ret != 0 ]]; then
     exit
 fi
 
+if [[ ! -z $url2 ]]; then
+    http2_req=$(curl --max-time $max_timeout -v $url2 2>&1 )
+    http2_ret=$?
+    if [[ $http2_ret != 0 ]]; then
+        echo "Network may be down"
+        exit
+    fi
+fi
+
 http_req=$(curl --max-time $max_timeout -v $url 2>&1 )
 http_ret=$?
 scwd=`dirname $0`
